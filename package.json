@@ -1,0 +1,22 @@
+{
+  "name": "tailwind-shopify-setup",
+  "version": "1.0.0",
+  "description": "A simple package to set up Tailwind CSS in your project.",
+  "main": "index.js",
+  "bin": {
+    "tailwind-shopify-setup": "./index.js"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "postcss src/styles.css -o dist/styles.css"
+  },
+  "dependencies": {
+    "shelljs": "^0.8.5"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.20",
+    "tailwindcss": "^3.4.17"
+  },
+  "author": "",
+  "license": "ISC"
+}
