@@ -20,7 +20,7 @@ function addTailwindToThemeLiquid() {
       // Find the <head> section and add the stylesheet link inside it
       const headEndIndex = themeLiquid.indexOf("</head>");
       const linkTag = `
-  "{{ 'tailwind.css' | asset_url | stylesheet_tag }}"
+        {{ 'tailwind.css' | asset_url | stylesheet_tag }}
       `;
       themeLiquid =
         themeLiquid.slice(0, headEndIndex) +
@@ -33,6 +33,90 @@ function addTailwindToThemeLiquid() {
     }
   } else {
     shell.echo("❌ 'layout/theme.liquid' not found.");
+  }
+}
+
+function createGitIgnore() {
+  const gitIgnorePath = ".gitignore";
+  if (!fs.existsSync(gitIgnorePath)) {
+    shell.echo("📄 Creating '.gitignore' file...");
+    fs.writeFileSync(
+      gitIgnorePath,
+      `
+.DS_Store
+node_modules
+package-lock.json
+.env
+/.idea
+      `
+    );
+    shell.echo("✅ '.gitignore' has been created.");
+  } else {
+    shell.echo("ℹ️ '.gitignore' already exists. Ensuring correct content.");
+  }
+
+  const gitIgnoreContent = fs.readFileSync(gitIgnorePath, "utf8");
+  if (
+    !gitIgnoreContent.includes(".DS_Store") ||
+    !gitIgnoreContent.includes("node_modules") ||
+    !gitIgnoreContent.includes("package-lock.json") ||
+    !gitIgnoreContent.includes(".env") ||
+    !gitIgnoreContent.includes("/.idea")
+  ) {
+    shell.echo("📄 Updating '.gitignore'...");
+    fs.appendFileSync(
+      gitIgnorePath,
+      `
+.DS_Store
+node_modules
+package-lock.json
+.env
+/.idea
+      `
+    );
+    shell.echo("✅ '.gitignore' has been updated.");
+  }
+}
+
+function createShopifyIgnore() {
+  const shopifyIgnorePath = ".shopifyignore";
+  if (!fs.existsSync(shopifyIgnorePath)) {
+    shell.echo("📄 Creating '.shopifyignore' file...");
+    fs.writeFileSync(
+      shopifyIgnorePath,
+      `
+package.json
+package-lock.json
+tailwind.config.js
+tailwind-config.css
+html-ref.html
+      `
+    );
+    shell.echo("✅ '.shopifyignore' has been created.");
+  } else {
+    shell.echo("ℹ️ '.shopifyignore' already exists. Ensuring correct content.");
+  }
+
+  const shopifyIgnoreContent = fs.readFileSync(shopifyIgnorePath, "utf8");
+  if (
+    !shopifyIgnoreContent.includes("package.json") ||
+    !shopifyIgnoreContent.includes("package-lock.json") ||
+    !shopifyIgnoreContent.includes("tailwind.config.js") ||
+    !shopifyIgnoreContent.includes("tailwind-config.css") ||
+    !shopifyIgnoreContent.includes("html-ref.html")
+  ) {
+    shell.echo("📄 Updating '.shopifyignore'...");
+    fs.appendFileSync(
+      shopifyIgnorePath,
+      `
+package.json
+package-lock.json
+tailwind.config.js
+tailwind-config.css
+html-ref.html
+      `
+    );
+    shell.echo("✅ '.shopifyignore' has been updated.");
   }
 }
 
@@ -59,10 +143,11 @@ function installTailwindCSS() {
     }
   }
 
-  // Install Tailwind CSS and dependencies
+  // Install Tailwind CSS and dependencies (specific version)
   shell.echo("⬇️ Installing Tailwind CSS and its dependencies...");
   if (
-    shell.exec("npm install -D tailwindcss postcss autoprefixer").code !== 0
+    shell.exec("npm install -D tailwindcss@3.4.15 postcss autoprefixer")
+      .code !== 0
   ) {
     shell.echo("❌ Failed to install Tailwind CSS.");
     shell.exit(1);
@@ -129,6 +214,10 @@ module.exports = {
 
   // Add stylesheet link to 'theme.liquid'
   addTailwindToThemeLiquid();
+
+  // Create and update .gitignore and .shopifyignore
+  createGitIgnore();
+  createShopifyIgnore();
 
   shell.echo("🎉 Tailwind CSS has been installed and configured successfully!");
   shell.echo("👉 To build your CSS, run: npm run tailwind");
