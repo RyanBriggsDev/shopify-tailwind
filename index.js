@@ -3,33 +3,55 @@
 const shell = require("shelljs");
 const fs = require("fs");
 const path = require("path");
+const readline = require("readline");
+
+// Create readline interface for user input
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout
+});
 
 function isShopifyProject() {
   return fs.existsSync(path.join("layout", "theme.liquid"));
 }
 
-function addTailwindToThemeLiquid() {
+function promptForVersion() {
+  return new Promise((resolve) => {
+    rl.question(
+      "Which version of Tailwind CSS would you like to install? (3/4): ",
+      (answer) => {
+        const version = answer.trim();
+        if (version === "3" || version === "4") {
+          resolve(version);
+        } else {
+          console.log("❌ Invalid version. Please enter either 3 or 4.");
+          promptForVersion().then(resolve);
+        }
+      }
+    );
+  });
+}
+
+function addTailwindToThemeLiquid(version = "3") {
   const themeLiquidPath = "layout/theme.liquid";
   if (fs.existsSync(themeLiquidPath)) {
     let themeLiquid = fs.readFileSync(themeLiquidPath, "utf8");
 
     // Check if the <link> to tailwind.css already exists
-    if (
-      !themeLiquid.includes("{{ 'tailwind.css' | asset_url | stylesheet_tag }}")
-    ) {
+    const cssFile = version === "3" ? "tailwind.css" : "tailwind-output.css";
+    const linkTag = `{{ '${cssFile}' | asset_url | stylesheet_tag }}`;
+    
+    if (!themeLiquid.includes(linkTag)) {
       // Find the <head> section and add the stylesheet link inside it
       const headEndIndex = themeLiquid.indexOf("</head>");
-      const linkTag = `
-        {{ 'tailwind.css' | asset_url | stylesheet_tag }}
-      `;
       themeLiquid =
         themeLiquid.slice(0, headEndIndex) +
         linkTag +
         themeLiquid.slice(headEndIndex);
       fs.writeFileSync(themeLiquidPath, themeLiquid);
-      shell.echo("✅ Added Tailwind CSS link reference to 'theme.liquid'.");
+      shell.echo(`✅ Added Tailwind CSS v${version} link reference to 'theme.liquid'.`);
     } else {
-      shell.echo("ℹ️ Tailwind CSS link already exists in 'theme.liquid'.");
+      shell.echo(`ℹ️ Tailwind CSS v${version} link already exists in 'theme.liquid'.`);
     }
   } else {
     shell.echo("❌ 'layout/theme.liquid' not found.");
@@ -143,18 +165,29 @@ function installTailwindCSS() {
     }
   }
 
-  // Install Tailwind CSS and dependencies (specific version)
-  shell.echo("⬇️ Installing Tailwind CSS and its dependencies...");
+  // Prompt for version selection
+  promptForVersion().then(async (version) => {
+    if (version === "3") {
+      await installTailwindV3();
+    } else {
+      await installTailwindV4();
+    }
+    rl.close();
+  });
+}
+
+async function installTailwindV3() {
+  shell.echo("⬇️ Installing Tailwind CSS v3 and its dependencies...");
   if (
     shell.exec("npm install -D tailwindcss@3.4.15 postcss autoprefixer")
       .code !== 0
   ) {
-    shell.echo("❌ Failed to install Tailwind CSS.");
+    shell.echo("❌ Failed to install Tailwind CSS v3.");
     shell.exit(1);
   }
 
-  // Generate Tailwind config file
-  shell.echo("⚙️ Generating custom Tailwind config file...");
+  // Generate Tailwind config file for v3
+  shell.echo("⚙️ Generating Tailwind v3 config file...");
   const configFilePath = "tailwind.config.js";
   const customConfig = `
 /** @type {import('tailwindcss').Config} */
@@ -199,18 +232,13 @@ module.exports = {
     shell.echo(`ℹ️ '${stylesPath}' already exists. Skipping creation.`);
   }
 
-  // Add build script to package.json if not present
+  // Add build script to package.json
   const packageJsonPath = "package.json";
   const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
-  if (!packageJson.scripts || !packageJson.scripts.tailwind) {
-    packageJson.scripts = packageJson.scripts || {};
-    packageJson.scripts.tailwind =
-      "npx tailwindcss -i ./tailwind-config.css -o ./assets/tailwind.css --watch";
-    fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
-    shell.echo("✅ Added 'build' script to 'package.json'.");
-  } else {
-    shell.echo("ℹ️ 'build' script already exists in 'package.json'.");
-  }
+  packageJson.scripts = packageJson.scripts || {};
+  packageJson.scripts.tailwind =
+    "npx tailwindcss -i ./tailwind-config.css -o ./assets/tailwind.css --watch";
+  fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
 
   // Add stylesheet link to 'theme.liquid'
   addTailwindToThemeLiquid();
@@ -219,11 +247,67 @@ module.exports = {
   createGitIgnore();
   createShopifyIgnore();
 
-  shell.echo("🎉 Tailwind CSS has been installed and configured successfully!");
+  shell.echo("🎉 Tailwind CSS v3 has been installed and configured successfully!");
   shell.echo("👉 To build your CSS, run: npm run tailwind");
-  shell.echo(
-    "👉 Include 'assets/tailwind.css' in your Shopify 'theme.liquid' file."
-  );
+}
+
+async function installTailwindV4() {
+  shell.echo("⬇️ Installing Tailwind CSS v4 and its CLI...");
+  
+  // Install Tailwind v4 and CLI
+  if (shell.exec("npm install -D tailwindcss @tailwindcss/cli").code !== 0) {
+    shell.echo("❌ Failed to install Tailwind CSS v4 and CLI.");
+    shell.exit(1);
+  }
+  
+  shell.echo("✅ Successfully installed Tailwind CSS v4 and CLI");
+  
+  // Add package.json to .shopifyignore
+  const shopifyIgnorePath = ".shopifyignore";
+  const v4IgnoreContent = `
+package.json
+  `;
+  
+  if (fs.existsSync(shopifyIgnorePath)) {
+    const currentContent = fs.readFileSync(shopifyIgnorePath, "utf8");
+    if (!currentContent.includes("package.json")) {
+      fs.writeFileSync(shopifyIgnorePath, currentContent + v4IgnoreContent);
+    }
+  } else {
+    fs.writeFileSync(shopifyIgnorePath, v4IgnoreContent);
+  }
+  
+  shell.echo("✅ Updated .shopifyignore with package.json");
+
+  // Create assets directory if it doesn't exist
+  if (!fs.existsSync("assets")) {
+    fs.mkdirSync("assets");
+  }
+
+  // Create tailwind-config.css in assets directory
+  const configPath = "assets/tailwind-config.css";
+  const configContent = `@import "tailwindcss" prefix(tw);
+
+@theme {
+    --breakpoint-sm: 450px;
+    --breakpoint-md: 768px;
+    --breakpoint-lg: 990px;
+    --breakpoint-xl: 1280px;
+}`;
+
+  fs.writeFileSync(configPath, configContent);
+  shell.echo("✅ Created tailwind-config.css in assets directory");
+
+  // Add build script to package.json
+  const packageJsonPath = "package.json";
+  const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
+  packageJson.scripts = packageJson.scripts || {};
+  packageJson.scripts.tailwind = "npx @tailwindcss/cli -i ./assets/tailwind-config.css -o ./assets/tailwind-output.css --watch";
+  fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
+  shell.echo("✅ Added Tailwind v4 build script to package.json");
+
+  // Add stylesheet link to theme.liquid
+  addTailwindToThemeLiquid("4");
 }
 
 // Run the installation function
